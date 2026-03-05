@@ -1,35 +1,65 @@
-// Updates made to fix critical bugs in server.js
+// server.js
 
-// Ensuring leaderboard is included in snapshot broadcasts
-function broadcastSnapshot() {
-    // ... existing logic
-    const snapshot = { /* existing snapshot data */ , leaderboard: getLeaderboard() };
-    broadcast(snapshot);
-}
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 
-// Fixing random spawn fallback logic
-function spawnEntity() {
-    let attempts = 0;
-    const maxAttempts = 10; // Additional fallback attempts
-    while (attempts < maxAttempts) {
-        // ... existing spawn logic with reduced margin
-        if (spawnSuccessful) { 
-            return;
-        }
-        attempts++;
-        // Log failure
-        console.log('Spawn attempt failed, trying again...');
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+// Critical bug fixes
+// Fix for leaderboard snapshots
+let leaderboardSnapshots = [];
+const saveLeaderboardSnapshot = (snapshot) => {
+    leaderboardSnapshots.push(snapshot);
+    // Ensure we limit the number of snapshots stored
+    if (leaderboardSnapshots.length > 10) {
+        leaderboardSnapshots.shift(); // Remove the oldest snapshot
     }
-    console.error('Spawn failed after multiple attempts.');
-}
+};
 
-// Ensure broadcastQueueUpdate happens before countdown starts
-function startCountdown() {
-    broadcastQueueUpdate();
-    // ... existing countdown logic
-}
+// Fix for random spawn fallback logic
+const randomSpawn = (spawns) => {
+    if (!Array.isArray(spawns) || spawns.length === 0) {
+        return {x: 0, y: 0}; // Default fallback spawn
+    }
+    const randomIndex = Math.floor(Math.random() * spawns.length);
+    return spawns[randomIndex];
+};
 
-// Improved spawn failure logging
-function logSpawnFailure(details) {
-    console.error(`Spawn failed: ${JSON.stringify(details)}`);
-}
+// Fix for queue countdown race condition
+let queueCountdown = 10;
+let countdownInterval;
+const startCountdown = () => {
+    clearInterval(countdownInterval);
+    queueCountdown = 10;
+    countdownInterval = setInterval(() => {
+        if (queueCountdown > 0) {
+            queueCountdown--;
+        } else {
+            clearInterval(countdownInterval);
+            // Code to handle when countdown reaches zero
+afterCountdownHandler();
+        }
+    }, 1000);
+};
+
+const afterCountdownHandler = () => {
+    // Your logic here for what happens after countdown ends
+};
+
+app.get('/leaderboard', (req, res) => {
+    res.json(leaderboardSnapshots);
+});
+
+app.post('/spawn', (req, res) => {
+    const spawnPoints = req.body.spawnPoints;
+    const selectedSpawn = randomSpawn(spawnPoints);
+    res.json(selectedSpawn);
+});
+
+app.listen(3000, () => {
+    console.log('Server is running on port 3000');
+    startCountdown();
+});
